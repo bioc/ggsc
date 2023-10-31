@@ -1,6 +1,6 @@
 Package: ggsc
 Title: Visualizing Single Cell Data
-Version: 1.0.1
+Version: 1.0.2
 Authors@R: c(
        person("Guangchuang", "Yu", 
               email = "guangchuangyu@gmail.com", 
@@ -19,6 +19,7 @@ Description: Useful functions to visualize single cell and spatial
   implemented in 'ggplot2'.
 Imports:
   Rcpp,
+  RcppParallel,
   cli,
   dplyr,
   ggplot2,
@@ -70,4 +71,5 @@ RoxygenNote: 7.2.3
 Config/testthat/edition: 3
 LinkingTo: 
   Rcpp,
-  RcppArmadillo
+  RcppArmadillo,
+  RcppParallel
