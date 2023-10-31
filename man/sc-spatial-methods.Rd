@@ -22,7 +22,11 @@ sc_spatial(
   mapping = NULL,
   ncol = 6,
   density = FALSE,
-  grid.n = 400,
+  grid.n = 100,
+  joint = FALSE,
+  joint.fun = prod,
+  common.legend = TRUE,
+  point.size = 5,
   ...
 )
 
@@ -40,7 +44,11 @@ sc_spatial(
   mapping = NULL,
   ncol = 6,
   density = FALSE,
-  grid.n = 400,
+  grid.n = 100,
+  joint = FALSE,
+  joint.fun = prod,
+  common.legend = TRUE,
+  point.size = 5,
   ...
 )
 
@@ -49,16 +57,20 @@ sc_spatial(
   features = NULL,
   sample.id = NULL,
   image.id = NULL,
-  slot = 1,
+  slot = "data",
   image.plot = TRUE,
   image.first.operation = "rotate",
   image.rotate.degree = NULL,
-  image.mirror.axis = "v",
+  image.mirror.axis = NULL,
   remove.point = FALSE,
   mapping = NULL,
   ncol = 6,
   density = FALSE,
-  grid.n = 400,
+  grid.n = 100,
+  joint = FALSE,
+  joint.fun = prod,
+  common.legend = TRUE,
+  point.size = 5,
   ...
 )
 }
@@ -96,7 +108,18 @@ if your just view the issue image, default is FALSE.}
 \item{density}{whether plot the 2D weighted kernel density, default is FALSE.}
 
 \item{grid.n}{number of grid points in the two directions to estimate 2D
-weighted kernel density, default is 400.}
+weighted kernel density, default is 100.}
+
+\item{joint}{whether joint the multiple features with \code{joint.fun},
+default is FALSE.}
+
+\item{joint.fun}{how to joint the multiple features if \code{joint = TRUE},
+default is prod.}
+
+\item{common.legend}{whether to use \code{facet_wrap} to display the multiple
+\code{features}, default is TRUE.}
+
+\item{point.size}{the size of point, default is 5.}
 
 \item{...}{additional parameters.}
 }
