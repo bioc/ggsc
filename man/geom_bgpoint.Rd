@@ -101,32 +101,17 @@ internal size aesthetics of \code{geom_bgpoint}}
 this add the background color for \code{\link[ggplot2]{geom_point}}
 }
 \details{
+Aesthetics \code{geom_bgpoint} understands the following aesthetics. Required
+aesthetics are displayed in bold and defaults are displayed for optional aesthetics:
 \itemize{
+\item \strong{\code{x}}.
+\item \strong{\code{y}}.
 \item \code{colour} the colour of point, default is \code{black}.
 \item \code{bg_colour} the colour of background point, default is \code{NA}.
 \item \code{alpha} the transparency of colour, default is 1.
 \item \code{subset} subset the data frame which meet conditions to display.
 }
 }
-\section{Aesthetics}{
-
-\code{geom_bgpoint()} understands the following aesthetics (required aesthetics are in bold):
-\itemize{
-\item \strong{\code{\link[=aes_position]{x}}}
-\item \strong{\code{\link[=aes_position]{y}}}
-\item \code{\link[=aes_colour_fill_alpha]{alpha}}
-\item \code{bg_colour}
-\item \code{\link[=aes_colour_fill_alpha]{colour}}
-\item \code{\link[=aes_colour_fill_alpha]{fill}}
-\item \code{\link[=aes_group_order]{group}}
-\item \code{\link[=aes_linetype_size_shape]{shape}}
-\item \code{\link[=aes_linetype_size_shape]{size}}
-\item \code{stroke}
-\item \code{subset}
-}
-Learn more about setting these aesthetics in \code{vignette("ggplot2-specs")}.
-}
-
 \examples{
 library(ggplot2)
 ggplot(iris,
