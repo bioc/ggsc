@@ -1,4 +1,4 @@
-# ggsc 1.11.1
+# ggsc 1.10.1
 
 + compatible with Seurat V5 (2026-05-17, Sun)
 
