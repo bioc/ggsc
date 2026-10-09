@@ -59,45 +59,44 @@
     grDevices::colorRampPalette(col2)(n)
 }
 
-# This was refering to the stat_ellipse of ggplot2
-.calculate_ellipse <- function(data, vars, type = 't', level= NULL, segments=50){
-  dfn <- 2
-  dfd <- nrow(data) - 1
-  if (is.null(level)){
-     level <- .9
-  }
-
-  if (!type %in% c("t", "norm", "euclid")) {
-    cli::cli_inform("Unrecognized ellipse type")
-    ellipse <- matrix(NA_real_, ncol = 2)
-  } else if (dfd < 3) {
-    cli::cli_inform("Too few points to calculate an ellipse")
-    ellipse <- matrix(NA_real_, ncol = 2)
+## The two reduction coordinates plotted by a `sc_dim()` figure.
+##
+## `extract_data()` returns the barcode column first and the reduction
+## coordinates after it, so look the coordinates up by name rather than by
+## position; fall back to the old positional columns for any other layout.
+.dim_xy_vars <- function(plot) {
+  nm <- names(plot$data)
+  if (".BarcodeID" %in% nm) {
+    xy <- setdiff(nm, ".BarcodeID")
   } else {
-    if (type == "t") {
-      v <- MASS::cov.trob(data[,vars])
-    } else if (type == "norm") {
-      v <- stats::cov.wt(data[,vars])
-    } else if (type == "euclid") {
-      v <- stats::cov.wt(data[,vars])
-      v$cov <- diag(rep(min(diag(v$cov)), 2))
-    }
-    shape <- v$cov
-    center <- v$center
-    chol_decomp <- chol(shape)
-    if (type == "euclid") {
-      radius <- level/max(chol_decomp)
-    } else {
-      radius <- sqrt(dfn * stats::qf(level, dfn, dfd))
-    }
-    angles <- (0:segments) * 2 * pi/segments
-    unit.circle <- cbind(cos(angles), sin(angles))
-    ellipse <- t(center + radius * t(unit.circle %*% chol_decomp))
+    ## keep the previous positional behaviour for other layouts
+    xy <- nm[seq_len(min(3L, length(nm)))]
+    xy <- xy[-1L]
   }
+  if (length(xy) < 2L) {
+    cli::cli_abort("`plot` must contain at least two reduction dimensions.")
+  }
+  xy[seq_len(2L)]
+}
 
-  colnames(ellipse) <- vars
-  res <- stats::cov.wt(ellipse)
-  res <- res$center |> as.matrix() |> t() |> data.frame()
+## Centre of each group, used by `sc_dim_geom_label()` to position labels.
+##
+## This used to build a 51-point ellipse outline and then average the sampled
+## boundary points.  `chol()` returns an upper-triangular factor, so a uniform
+## grid of angles maps to a non-uniformly sampled ellipse: the average of the
+## boundary points is offset from the true centre, and the offset scales with
+## the ellipse radius -- i.e. labels drifted with `level`, even though no
+## ellipse is drawn here.  The centre is available directly.
+.group_center <- function(data, vars){
+  if (nrow(data) - 1 < 3) {
+    cli::cli_inform("Too few points to calculate an ellipse")
+    res <- as.data.frame(matrix(NA_real_, nrow = 1, ncol = length(vars)))
+    colnames(res) <- vars
+    return(res)
+  }
+  v <- MASS::cov.trob(data[, vars])
+  res <- as.data.frame(matrix(v$center, nrow = 1))
+  colnames(res) <- vars
   return(res)
 }
 

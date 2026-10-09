@@ -12,9 +12,12 @@ other option is \code{geom_mark_hull} of \code{ggforce}.}
 
 \item{mapping}{aesthetic mapping}
 
-\item{level}{the level at which to draw an ellipse}
+\item{level}{the level at which to draw an ellipse; only forwarded when
+\code{geom} accepts a \code{level} argument (e.g. \code{stat_ellipse}),
+so that geoms such as \code{ggforce::geom_mark_hull} are not passed an
+unknown parameter}
 
-\item{...}{additional parameters pass to the stat_ellipse}
+\item{...}{additional parameters pass to \code{geom}}
 }
 \value{
 layer of ellipse

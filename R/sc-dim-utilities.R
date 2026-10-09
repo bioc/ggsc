@@ -181,47 +181,74 @@ sc_dim_geom_label <- function(geom = ggplot2::geom_text, mapping=NULL, ...) {
         class = "sc_dim_geom_label")
 }
 
-##' @importFrom ggplot2 ggplot_add
-##' @importFrom rlang .data
-##' @method ggplot_add sc_dim_geom_label
-##' @export
-ggplot_add.sc_dim_geom_label <- function(object, plot, object_name, ...) {
-    dims <- names(plot$data)[seq_len(3)]
-    if (!is.null(object$mapping$label)){
-        lab.text <- ggfun::get_aes_var(object$mapping, 'label')
-        object$mapping$label <- NULL
-    }else{
+## Resolve the column that defines the groups for a `sc_dim_geom_*` layer:
+## either the aesthetic the caller mapped, or the plot's `colour` column.
+## Returns the (possibly modified) `object`, the column name, and whether that
+## column can be used for grouping.
+.dim_group_col <- function(object, plot, key) {
+    if (!is.null(object$mapping[[key]])) {
+        lab.text <- ggfun::get_aes_var(object$mapping, key)
+        object$mapping[[key]] <- NULL
+    } else {
         lab.text <- ggplot_build(plot)$plot$labels$colour
     }
-    flag1 <- lab.text %in% colnames(plot$data) && !is.numeric(plot$data[[lab.text]]) 
-    if (is.null(object$data) && flag1) {
-        object$data <- split(plot$data, plot$data[[lab.text]]) |> 
-            lapply(function(x).calculate_ellipse(x, vars = dims[c(2, 3)], level=object$level)) |>
-            dplyr::bind_rows(.id=lab.text) 
-        object$level <- NULL
-        object$data <- .set_label_levels(object$data, plot, lab.text)
-    }else{
-        cli::cli_abort("The `label` in mapping should be specified, and the data should not be numeric type!")
-    }
+    ok <- lab.text %in% colnames(plot$data) && !is.numeric(plot$data[[lab.text]])
+    list(object = object, lab.text = lab.text, ok = ok)
+}
 
-    geom <- object$geom
-    object$geom <- NULL
-    default_mapping <- aes(x=!!rlang::sym(dims[2]), y = !!rlang::sym(dims[3]), label = !!rlang::sym(lab.text))
+## Shared tail of `sc_dim_geom_ellipse()` / `sc_dim_geom_label()`: merge the
+## default mapping with the caller's, keep the layer off the plot's own colour
+## scale, and hand the result to the requested geom.
+.add_dim_layer <- function(object, plot, object_name, default_mapping, ...) {
     if (is.null(object$mapping)) {
         object$mapping <- default_mapping
     } else {
         object$mapping <- utils::modifyList(default_mapping, object$mapping)
     }
 
-    flag2 <- .check_colour(plot, object)
-    if (flag2){
+    if (.check_colour(plot, object)) {
         object$colour <- 'black'
     }
-    
     object <- .set_inherit.aes(object)
 
-    ly <- do.call(geom, object)    
-    ggplot_add(ly, plot, object_name, ...)
+    geomfun <- object$geom
+    object$geom <- NULL
+    ggplot_add(do.call(geomfun, object), plot, object_name, ...)
+}
+
+##' @importFrom ggplot2 ggplot_add
+##' @importFrom rlang .data
+##' @method ggplot_add sc_dim_geom_label
+##' @export
+ggplot_add.sc_dim_geom_label <- function(object, plot, object_name, ...) {
+    xy <- .dim_xy_vars(plot)
+    grp <- .dim_group_col(object, plot, "label")
+    object <- grp$object
+
+    if (!is.null(object$data)) {
+        cli::cli_abort(c(
+            "`sc_dim_geom_label()` derives the label positions from the plot.",
+            "x" = "`data` must not be supplied.",
+            "i" = "Map a non-numeric column to `colour`, or supply `mapping`."
+        ))
+    }
+    if (!grp$ok) {
+        cli::cli_abort(c(
+            "The label column could not be determined.",
+            "x" = "The plot has no non-numeric column to label the groups by.",
+            "i" = "Map a non-numeric column to `colour`, or supply `mapping = aes(label = ...)`."
+        ))
+    }
+
+    object$data <- split(plot$data, plot$data[[grp$lab.text]]) |>
+        lapply(function(x) .group_center(x, vars = xy)) |>
+        dplyr::bind_rows(.id = grp$lab.text)
+    object$level <- NULL
+    object$data <- .set_label_levels(object$data, plot, grp$lab.text)
+
+    default_mapping <- aes(x = !!rlang::sym(xy[1]), y = !!rlang::sym(xy[2]),
+                           label = !!rlang::sym(grp$lab.text))
+    .add_dim_layer(object, plot, object_name, default_mapping, ...)
 }
 
 
@@ -231,8 +258,11 @@ ggplot_add.sc_dim_geom_label <- function(object, plot, object_name, ...) {
 ##' @param geom the layer function, default is \code{stat_ellipse},
 ##' other option is \code{geom_mark_hull} of \code{ggforce}.
 ##' @param mapping aesthetic mapping
-##' @param level the level at which to draw an ellipse
-##' @param ... additional parameters pass to the stat_ellipse
+##' @param level the level at which to draw an ellipse; only forwarded when
+##' \code{geom} accepts a \code{level} argument (e.g. \code{stat_ellipse}),
+##' so that geoms such as \code{ggforce::geom_mark_hull} are not passed an
+##' unknown parameter
+##' @param ... additional parameters pass to \code{geom}
 ##' @return layer of ellipse
 ##' @seealso
 ##'  [stat_ellipse][ggplot2::stat_ellipse]; 
@@ -251,8 +281,15 @@ ggplot_add.sc_dim_geom_label <- function(object, plot, object_name, ...) {
 ##' p2 <- sc_dim(sce, reduction = 'UMAP')
 ##' f1 <- p1 + sc_dim_geom_ellipse()
 sc_dim_geom_ellipse <- function(geom = stat_ellipse, mapping = NULL, level = 0.95, ...) {
-    structure(list(geom = geom, mapping = mapping, level = level, ...), 
-              class = "sc_dim_geom_ellipse")
+    params <- list(geom = geom, mapping = mapping, ...)
+    ## `level` is specific to stat_ellipse(); forwarding it to a geom that does
+    ## not accept it (e.g. ggforce::geom_mark_hull) makes ggplot2 emit
+    ## "Ignoring unknown parameters: `level`".
+    geom_fmls <- tryCatch(names(formals(geom)), error = function(e) NULL)
+    if (is.null(geom_fmls) || "level" %in% geom_fmls) {
+        params$level <- level
+    }
+    structure(params, class = "sc_dim_geom_ellipse")
 }
 
 ##' @importFrom ggplot2 ggplot_add
@@ -262,37 +299,21 @@ sc_dim_geom_ellipse <- function(geom = stat_ellipse, mapping = NULL, level = 0.9
 ##' @importFrom ggplot2 stat_ellipse
 ##' @export
 ggplot_add.sc_dim_geom_ellipse <- function(object, plot, object_name, ...) {
-    dims <- names(plot$data)[seq_len(3)]
-    if (!is.null(object$mapping$group)){
-        lab.text <- ggfun::get_aes_var(object$mapping, 'group')
-        object$mapping$group <- NULL
-    }else{
-        lab.text <- ggplot_build(plot)$plot$labels$colour
-    }
-    flag1 <- lab.text %in% colnames(plot$data) && !is.numeric(plot$data[[lab.text]])
-    if (!flag1){
-        cli::cli_abort("The `group` in mapping should be specified, and the data should not be numeric type!")
-    }
-    default_mapping <- aes(x = !!rlang::sym(dims[2]), 
-                           y = !!rlang::sym(dims[3]), 
-                           group = !!rlang::sym(lab.text))
-    if (is.null(object$mapping)) {
-        mapping <- default_mapping
-    } else {
-        mapping <- modifyList(default_mapping, object$mapping)
-    }
-    object$mapping <- mapping
-    
-    flag2 <- .check_colour(plot, object)
-    if (flag2){
-        object$colour <- 'black'
-    }
-    object <- .set_inherit.aes(object)    
-    geomfun <- object$geom
-    object$geom <- NULL
+    xy <- .dim_xy_vars(plot)
+    grp <- .dim_group_col(object, plot, "group")
+    object <- grp$object
 
-    ly <- do.call(geomfun, object)
-    ggplot_add(ly, plot, object_name, ...)
+    if (!grp$ok) {
+        cli::cli_abort(c(
+            "The group column could not be determined.",
+            "x" = "The plot has no non-numeric column to group the ellipses by.",
+            "i" = "Map a non-numeric column to `colour`, or supply `mapping = aes(group = ...)`."
+        ))
+    }
+
+    default_mapping <- aes(x = !!rlang::sym(xy[1]), y = !!rlang::sym(xy[2]),
+                           group = !!rlang::sym(grp$lab.text))
+    .add_dim_layer(object, plot, object_name, default_mapping, ...)
 }
 
 ##' @title sc_dim_geom_subset

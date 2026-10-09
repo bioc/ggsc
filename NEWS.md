@@ -1,3 +1,9 @@
+# ggsc 1.11.3
+
++ `sc_dim_geom_ellipse()` only passes `level` to layer functions that accept it, so the documented `geom = ggforce::geom_mark_hull` no longer warns about an unknown parameter (2026-10-09, Fri)
++ `sc_dim_geom_label()` places labels at the true group centre; the reference point was averaged from a sampled ellipse outline, which was offset from the centre and drifted with the ellipse `level` (2026-10-09, Fri)
++ `sc_dim_geom_label(data = )` now reports that `data` must not be supplied, instead of an unrelated message about the label mapping (2026-10-09, Fri)
+
 # ggsc 1.11.2
 
 + compatible with new S4Vectors (2026-09-10, Thu)
